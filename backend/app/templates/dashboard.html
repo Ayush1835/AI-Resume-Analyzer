@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Resume Analyzer{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Row 1: Greeting & Action -->
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h1 class="fw-bold mb-1">Welcome back, {{ user.full_name or user.email }}!</h1>
+            <p class="text-secondary">Analyze your resumes against target job descriptions and manage your application history.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <a href="/analyze" class="btn btn-primary-custom px-4 py-2">
+                <i class="fa-solid fa-wand-magic-sparkles me-2"></i>New Analysis Run
+            </a>
+        </div>
+    </div>
+    
+    <!-- Row 2: Analytics Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card-glass h-100 p-3 metric-card">
+                <div class="metric-icon-box">
+                    <i class="fa-solid fa-file-invoice"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0">{{ total_resumes }}</h3>
+                    <span class="text-secondary fs-7 uppercase">Resumes Uploaded</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-glass h-100 p-3 metric-card">
+                <div class="metric-icon-box" style="color: #6366f1;">
+                    <i class="fa-solid fa-square-poll-vertical"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0">{{ total_analyses }}</h3>
+                    <span class="text-secondary fs-7">Analyses Completed</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-glass h-100 p-3 metric-card">
+                <div class="metric-icon-box" style="color: #10b981;">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0">
+                        {% if avg_ats_score >= 75 %}
+                            <span class="text-success">{{ avg_ats_score }}%</span>
+                        {% elif avg_ats_score >= 50 %}
+                            <span class="text-warning">{{ avg_ats_score }}%</span>
+                        {% else %}
+                            <span class="text-danger">{{ avg_ats_score }}%</span>
+                        {% endif %}
+                    </h3>
+                    <span class="text-secondary fs-7">Avg ATS Score</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-glass h-100 p-3 metric-card">
+                <div class="metric-icon-box" style="color: #3b82f6;">
+                    <i class="fa-solid fa-circle-nodes"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0">{{ avg_similarity_score }}%</h3>
+                    <span class="text-secondary fs-7">Avg Semantic Similarity</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Row 3: Skill Chart & Recent Run history -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card-glass h-100">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-chart-pie me-2 text-primary"></i>Top Matched Skills</h4>
+                {% if skill_labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="skillsChart"></canvas>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-brain-circuit fa-3x text-muted mb-3"></i>
+                        <p class="text-secondary mb-0">Run a resume evaluation to view your skill distribution metrics here!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card-glass h-100">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i>Recent Evaluation Runs</h4>
+                {% if recent_analyses %}
+                    <div class="table-responsive">
+                        <table class="table table-custom align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Resume / Job</th>
+                                    <th class="text-center">ATS</th>
+                                    <th class="text-center">Semantic</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in recent_analyses %}
+                                    <tr id="analysis-row-{{ run.id }}">
+                                        <td>
+                                            <div class="fw-bold text-truncate" style="max-width: 200px;">{{ run.resume_name }}</div>
+                                            <small class="text-secondary text-truncate d-block" style="max-width: 200px;">vs {{ run.jd_title }}</small>
+                                            <small class="text-muted d-block" style="font-size: 0.75rem;">{{ run.created_at }}</small>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if run.ats_score >= 75 %}
+                                                <span class="badge-custom badge-success-custom">{{ run.ats_score }}</span>
+                                            {% elif run.ats_score >= 50 %}
+                                                <span class="badge-custom badge-warning-custom">{{ run.ats_score }}</span>
+                                            {% else %}
+                                                <span class="badge-custom badge-danger-custom">{{ run.ats_score }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge-custom bg-secondary border text-light">{{ run.similarity_score }}%</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-inline-flex gap-2">
+                                                <a href="/api/analysis/{{ run.id }}/download" class="btn btn-outline-primary btn-sm rounded-circle" title="Download PDF Report">
+                                                    <i class="fa-solid fa-file-pdf"></i>
+                                                </a>
+                                                <button onclick="deleteAnalysis({{ run.id }}, 'analysis-row-{{ run.id }}')" class="btn btn-outline-danger btn-sm rounded-circle" title="Delete Evaluation">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-folder-open fa-3x text-muted mb-3"></i>
+                        <p class="text-secondary mb-0">No evaluations run yet. Get started by uploading a resume!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Row 4: My Resumes Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card-glass">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-folder me-2 text-primary"></i>My Uploaded Resumes</h4>
+                {% if user_resumes is not defined or not user_resumes %}
+                    {% set user_resumes = user.resumes %}
+                {% endif %}
+                
+                {% if user_resumes %}
+                    <div class="table-responsive">
+                        <table class="table table-custom align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Document Details</th>
+                                    <th>Contact Info</th>
+                                    <th>Extracted Core Skills</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for res in user_resumes %}
+                                    <tr id="resume-row-{{ res.id }}">
+                                        <td>
+                                            <div class="fw-bold">{{ res.filename }}</div>
+                                            <small class="text-secondary">Uploaded: {{ res.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        </td>
+                                        <td>
+                                            {% if res.extracted_json and res.extracted_json.contact %}
+                                                <div class="small">
+                                                    <div><i class="fa-solid fa-user me-1 text-muted"></i> {{ res.extracted_json.contact.name or 'N/A' }}</div>
+                                                    <div><i class="fa-solid fa-envelope me-1 text-muted"></i> {{ res.extracted_json.contact.email or 'N/A' }}</div>
+                                                    <div><i class="fa-solid fa-phone me-1 text-muted"></i> {{ res.extracted_json.contact.phone or 'N/A' }}</div>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">Not Extracted</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if res.extracted_json and res.extracted_json.skills %}
+                                                <div class="d-flex flex-wrap" style="max-width: 450px;">
+                                                    {% for skill in res.extracted_json.skills[:6] %}
+                                                        <span class="skill-tag matched mb-1">{{ skill }}</span>
+                                                    {% endfor %}
+                                                    {% if res.extracted_json.skills|length > 6 %}
+                                                        <span class="skill-tag mb-1 bg-secondary border">+{{ res.extracted_json.skills|length - 6 }} more</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">No skills found</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <button onclick="deleteResume({{ res.id }}, 'resume-row-{{ res.id }}')" class="btn btn-outline-danger btn-sm px-3 rounded-pill">
+                                                <i class="fa-solid fa-trash-can me-1"></i>Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-file-circle-plus fa-3x text-muted mb-3"></i>
+                        <p class="text-secondary mb-3">No resumes uploaded yet. Upload a document to start analyzing!</p>
+                        <a href="/analyze" class="btn btn-primary-custom px-4">
+                            <i class="fa-solid fa-cloud-arrow-up me-2"></i>Upload First Resume
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- ChartJS CDN for visual rendering of skills -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        {% if skill_labels %}
+        const ctx = document.getElementById('skillsChart').getContext('2d');
+        
+        // Color tokens
+        const isLightTheme = document.documentElement.getAttribute("data-theme") === "light";
+        const gridColor = isLightTheme ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)';
+        const labelColor = isLightTheme ? '#475569' : '#9ca3af';
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {{ skill_labels | tojson }},
+                datasets: [{
+                    label: 'Skills Frequency (Evaluated)',
+                    data: {{ skill_counts | tojson }},
+                    backgroundColor: 'rgba(99, 102, 241, 0.75)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    borderWidth: 1.5,
+                    borderRadius: 4,
+                    hoverBackgroundColor: 'rgba(59, 130, 246, 0.85)'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: labelColor, stepSize: 1 }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: labelColor }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    });
+</script>
+{% endblock %}

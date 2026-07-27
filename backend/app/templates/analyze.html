@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+
+{% block title %}Analyze Resume - AI Resume Analyzer{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- INPUT COLUMN -->
+    <div class="col-lg-5">
+        <div class="card-glass fade-in" id="inputCard">
+            <h3 class="fw-bold mb-4"><i class="fa-solid fa-wand-magic-sparkles me-2 text-primary"></i>Resume Analyzer</h3>
+            
+            <form id="analyzeForm" enctype="multipart/form-data">
+                <!-- 1. RESUME SECTION -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-secondary">1. Choose Resume</label>
+                    <select class="form-select form-control-custom mb-3" id="resumeSelect" name="resume_id" required>
+                        <option value="" disabled selected>-- Select an uploaded resume --</option>
+                        {% for r in resumes %}
+                            <option value="{{ r.id }}">{{ r.filename }} (Uploaded: {{ r.uploaded_at.strftime('%Y-%m-%d') }})</option>
+                        {% endfor %}
+                        <option value="new">+ Upload a new resume...</option>
+                    </select>
+                    
+                    <!-- Dynamic File Upload Zone (hidden unless 'new' is picked) -->
+                    <div id="newResumeUpload" class="d-none mb-3">
+                        <div class="upload-dropzone" id="uploadDropzone">
+                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                            <h5 class="fw-bold mb-1">Drag & Drop Resume</h5>
+                            <p class="text-secondary small mb-0">PDF or DOCX (Max 5MB)</p>
+                            <input type="file" id="resumeFile" class="d-none" accept=".pdf,.docx">
+                            <div id="fileInfo"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 2. JOB DESCRIPTION SECTION -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-secondary">2. Target Job Description</label>
+                    
+                    <ul class="nav nav-pills nav-pills-custom mb-3" id="jdTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="paste-tab" data-bs-toggle="pill" data-bs-target="#paste-pane" type="button" role="tab" aria-selected="true">
+                                <i class="fa-solid fa-keyboard me-1"></i>Paste Text
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="file-tab" data-bs-toggle="pill" data-bs-target="#file-pane" type="button" role="tab" aria-selected="false">
+                                <i class="fa-solid fa-file-import me-1"></i>Upload PDF
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="jdTabContent">
+                        <!-- Pane 1: Paste Text -->
+                        <div class="tab-pane fade show active" id="paste-pane" role="tabpanel" tabindex="0">
+                            <div class="mb-3">
+                                <input type="text" class="form-control form-control-custom mb-2" id="jdTitle" name="jd_title" placeholder="Job Title (e.g. Senior Python Developer)">
+                                <textarea class="form-control form-control-custom" id="jdText" name="jd_text" rows="8" placeholder="Paste the job description requirements here..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Pane 2: Upload File -->
+                        <div class="tab-pane fade" id="file-pane" role="tabpanel" tabindex="0">
+                            <div class="mb-3">
+                                <label for="jdFile" class="form-label text-secondary">Select Job Description Document (PDF/DOCX)</label>
+                                <input class="form-control form-control-custom" type="file" id="jdFile" name="jd_file" accept=".pdf,.docx">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom w-100 py-3" id="submitBtn">
+                    <i class="fa-solid fa-magnifying-glass-chart me-2"></i>Evaluate Match
+                </button>
+            </form>
+        </div>
+        
+        <!-- LOADING CONTAINER -->
+        <div class="card-glass text-center d-none p-5 fade-in" id="loadingCard">
+            <span class="loader-spinner mb-4"></span>
+            <h4 class="fw-bold mb-2">Analyzing Resume</h4>
+            <p class="text-secondary" id="loadingStep">Extracting text from documents...</p>
+        </div>
+    </div>
+    
+    <!-- RESULTS COLUMN -->
+    <div class="col-lg-7">
+        <!-- Placeholder Card -->
+        <div class="card-glass h-100 d-flex flex-column align-items-center justify-content-center text-center p-5" id="resultsPlaceholder">
+            <i class="fa-solid fa-magnifying-glass-chart fa-4x text-muted mb-3"></i>
+            <h4 class="fw-bold">Awaiting Input</h4>
+            <p class="text-secondary mb-0">Upload your resume and target job requirements to generate ATS match metrics.</p>
+        </div>
+        
+        <!-- Results Card -->
+        <div class="card-glass d-none fade-in" id="resultsCard">
+            <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+                <h3 class="fw-bold mb-0">Evaluation Results</h3>
+                <a href="" id="downloadReportBtn" class="btn btn-outline-primary btn-sm px-3 rounded-pill">
+                    <i class="fa-solid fa-file-pdf me-1"></i>Download Report
+                </a>
+            </div>
+            
+            <!-- Summary circle & Breakdown -->
+            <div class="row align-items-center mb-4">
+                <div class="col-md-5 text-center">
+                    <div class="gauge-container">
+                        <svg width="150" height="150" class="gauge-svg">
+                            <circle cx="75" cy="75" r="60" class="gauge-track"></circle>
+                            <circle cx="75" cy="75" r="60" class="gauge-bar" id="gaugeBar" stroke-dasharray="377" stroke-dashoffset="377"></circle>
+                        </svg>
+                        <div class="gauge-text">
+                            <div class="gauge-score" id="scoreValue">0</div>
+                            <div class="gauge-label">ATS Score</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-7">
+                    <h5 class="fw-bold mb-3">Matching Metrics</h5>
+                    
+                    <!-- Keyword Match -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>Keyword Density Matching</span>
+                            <span id="keywordScoreVal">0%</span>
+                        </div>
+                        <div class="progress" style="height: 6px; background-color: var(--bg-tertiary);">
+                            <div class="progress-bar bg-primary" id="keywordProgress" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Skills Match -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>Target Skills Match</span>
+                            <span id="skillsScoreVal">0%</span>
+                        </div>
+                        <div class="progress" style="height: 6px; background-color: var(--bg-tertiary);">
+                            <div class="progress-bar bg-success" id="skillsProgress" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Experience Match -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>Work Experience Match</span>
+                            <span id="experienceScoreVal">0%</span>
+                        </div>
+                        <div class="progress" style="height: 6px; background-color: var(--bg-tertiary);">
+                            <div class="progress-bar bg-warning" id="experienceProgress" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Semantic Similarity -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>Semantic Similarity Match</span>
+                            <span id="semanticScoreVal">0%</span>
+                        </div>
+                        <div class="progress" style="height: 6px; background-color: var(--bg-tertiary);">
+                            <div class="progress-bar bg-info" id="semanticProgress" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Result Tabs -->
+            <ul class="nav nav-tabs nav-pills-custom mb-3" id="resultTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="skills-tab" data-bs-toggle="tab" data-bs-target="#skills-pane" type="button" role="tab">Skills Gap</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="feedback-tab" data-bs-toggle="tab" data-bs-target="#feedback-pane" type="button" role="tab">AI Insights</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="suggestions-tab" data-bs-toggle="tab" data-bs-target="#suggestions-pane" type="button" role="tab">Improvements</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="resultTabsContent">
+                <!-- Tab 1: Skills Gap -->
+                <div class="tab-pane fade show active" id="skills-pane" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2 text-success"><i class="fa-solid fa-circle-check me-1"></i>Matched Skills</h6>
+                            <div id="matchedSkillsBox" class="d-flex flex-wrap"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2 text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>Missing Skills</h6>
+                            <div id="missingSkillsBox" class="d-flex flex-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tab 2: AI Insights -->
+                <div class="tab-pane fade" id="feedback-pane" role="tabpanel">
+                    <div class="mb-3">
+                        <h6 class="fw-bold mb-1 text-primary">Executive Professional Summary</h6>
+                        <p class="small text-secondary" id="aiSummary"></p>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-1 text-success">Key Strengths</h6>
+                            <ul class="small text-secondary ps-3" id="aiStrengths"></ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-1 text-danger">Identified Gaps</h6>
+                            <ul class="small text-secondary ps-3" id="aiWeaknesses"></ul>
+                        </div>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1 text-info">Career & Interview Advice</h6>
+                        <p class="small text-secondary mb-0" id="aiAdvice"></p>
+                    </div>
+                </div>
+                
+                <!-- Tab 3: Improvements -->
+                <div class="tab-pane fade" id="suggestions-pane" role="tabpanel">
+                    <div class="mb-3">
+                        <h6 class="fw-bold mb-2 text-primary">Actionable Suggestions</h6>
+                        <ul class="small text-secondary ps-3" id="actionSuggestions"></ul>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-2 text-primary">Resume Rewrite Examples</h6>
+                        <div id="rewritesBox" class="d-flex flex-column gap-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const resumeSelect = document.getElementById("resumeSelect");
+        const newResumeUpload = document.getElementById("newResumeUpload");
+        
+        // Show/hide drag & drop box depending on dropdown choice
+        resumeSelect.addEventListener("change", () => {
+            if (resumeSelect.value === "new") {
+                newResumeUpload.classList.remove("d-none");
+            } else {
+                newResumeUpload.classList.add("d-none");
+            }
+        });
+        
+        const analyzeForm = document.getElementById("analyzeForm");
+        const inputCard = document.getElementById("inputCard");
+        const loadingCard = document.getElementById("loadingCard");
+        const loadingStep = document.getElementById("loadingStep");
+        const resultsPlaceholder = document.getElementById("resultsPlaceholder");
+        const resultsCard = document.getElementById("resultsCard");
+        
+        analyzeForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            // Basic UI Toggle
+            inputCard.classList.add("d-none");
+            loadingCard.classList.remove("d-none");
+            resultsPlaceholder.classList.remove("d-none");
+            resultsCard.classList.add("d-none");
+            
+            try {
+                let resumeId = resumeSelect.value;
+                
+                // Step 1: Upload resume first if 'new' is selected
+                if (resumeId === "new") {
+                    loadingStep.innerText = "Uploading and parsing new resume file...";
+                    const resumeFileInput = document.getElementById("resumeFile");
+                    if (resumeFileInput.files.length === 0) {
+                        alert("Please drop or choose a resume file to upload.");
+                        resetUI();
+                        return;
+                    }
+                    
+                    const uploadData = new FormData();
+                    uploadData.append("file", resumeFileInput.files[0]);
+                    
+                    const uploadResponse = await fetch("/api/resumes/upload", {
+                        method: "POST",
+                        body: uploadData
+                    });
+                    
+                    if (!uploadResponse.ok) {
+                        const errData = await uploadResponse.json();
+                        alert(errData.detail || "Resume upload and parsing failed.");
+                        resetUI();
+                        return;
+                    }
+                    
+                    const resumeData = await uploadResponse.json();
+                    resumeId = resumeData.id;
+                }
+                
+                // Step 2: Trigger job description parsing and analysis
+                loadingStep.innerText = "Parsing job requirements & mapping capabilities...";
+                
+                const activeTab = document.querySelector("#jdTab .nav-link.active").id;
+                const analysisFormData = new FormData();
+                analysisFormData.append("resume_id", resumeId);
+                analysisFormData.append("jd_title", document.getElementById("jdTitle").value);
+                
+                if (activeTab === "paste-tab") {
+                    const jdText = document.getElementById("jdText").value;
+                    if (!jdText.strip) { // standard check
+                        if (!jdText.trim()) {
+                            alert("Please paste a job description.");
+                            resetUI();
+                            return;
+                        }
+                    }
+                    analysisFormData.append("jd_text", jdText);
+                } else {
+                    const jdFile = document.getElementById("jdFile");
+                    if (jdFile.files.length === 0) {
+                        alert("Please choose a job description file to upload.");
+                        resetUI();
+                        return;
+                    }
+                    analysisFormData.append("jd_file", jdFile.files[0]);
+                }
+                
+                loadingStep.innerText = "Calculating similarity and fetching AI feedback (this may take a few seconds)...";
+                
+                const analysisResponse = await fetch("/api/analysis/analyze", {
+                    method: "POST",
+                    body: analysisFormData
+                });
+                
+                if (!analysisResponse.ok) {
+                    const errData = await analysisResponse.json();
+                    alert(errData.detail || "Resume analysis compilation failed.");
+                    resetUI();
+                    return;
+                }
+                
+                const result = await analysisResponse.json();
+                
+                // Render results in DOM
+                renderResults(result);
+                
+            } catch (err) {
+                console.error(err);
+                alert("An unexpected error occurred during processing. Please try again.");
+                resetUI();
+            }
+        });
+        
+        function resetUI() {
+            inputCard.classList.remove("d-none");
+            loadingCard.classList.add("d-none");
+        }
+        
+        function renderResults(data) {
+            // Hide loading states
+            loadingCard.classList.add("d-none");
+            resultsPlaceholder.classList.add("d-none");
+            resultsCard.classList.remove("d-none");
+            inputCard.classList.remove("d-none");
+            
+            // Set download report href
+            document.getElementById("downloadReportBtn").href = `/api/analysis/${data.id}/download`;
+            
+            // Animate gauge ATS Score
+            animateScoreGauge(data.ats_score);
+            
+            // Update horizontal bars
+            updateProgressBar("keywordProgress", "keywordScoreVal", data.keyword_match_score);
+            updateProgressBar("skillsProgress", "skillsScoreVal", data.skills_match_score);
+            updateProgressBar("experienceProgress", "experienceScoreVal", data.experience_match_score);
+            updateProgressBar("semanticProgress", "semanticScoreVal", data.semantic_similarity_score);
+            
+            // Render Skills lists
+            const suggestions = data.suggestions_json || {};
+            renderTagBox("matchedSkillsBox", suggestions.matched_skills || [], "matched");
+            renderTagBox("missingSkillsBox", suggestions.missing_skills || [], "missing");
+            
+            // Render AI Feedback
+            const ai = data.ai_feedback_json || {};
+            document.getElementById("aiSummary").innerText = ai.summary || "No summary provided.";
+            renderList("aiStrengths", ai.strengths || [], "text-success", "check");
+            renderList("aiWeaknesses", ai.weaknesses || [], "text-danger", "xmark");
+            document.getElementById("aiAdvice").innerText = ai.career_advice || "No advice compiled.";
+            
+            // Render Improvements Suggestions
+            renderList("actionSuggestions", suggestions.improvements || [], "text-primary", "chevron-right");
+            
+            // Render Rewrites
+            const rewritesBox = document.getElementById("rewritesBox");
+            rewritesBox.innerHTML = "";
+            const rewrites = ai.rewrites || {};
+            
+            if (Object.keys(rewrites).length > 0) {
+                Object.entries(rewrites).forEach(([key, val]) => {
+                    // val is either a string or an object with original/improved keys
+                    let original = "";
+                    let improved = "";
+                    
+                    if (typeof val === "object") {
+                        original = val.original || "";
+                        improved = val.improved || "";
+                    } else {
+                        // If it's a simple key-value structure
+                        original = key;
+                        improved = val;
+                    }
+                    
+                    rewritesBox.innerHTML += `
+                        <div class="p-2 border rounded bg-secondary">
+                            <div class="text-danger small mb-1"><strong>❌ Original:</strong> "${original}"</div>
+                            <div class="text-success small"><strong>✔ AI Improved:</strong> "${improved}"</div>
+                        </div>
+                    `;
+                });
+            } else {
+                rewritesBox.innerHTML = `<p class="text-muted small">No specific rewrite bullet examples requested.</p>`;
+            }
+        }
+        
+        function updateProgressBar(barId, labelId, value) {
+            const bar = document.getElementById(barId);
+            const label = document.getElementById(labelId);
+            if (bar && label) {
+                bar.style.width = `${value}%`;
+                label.innerText = `${value}%`;
+            }
+        }
+        
+        function renderTagBox(boxId, tags, status) {
+            const box = document.getElementById(boxId);
+            if (!box) return;
+            box.innerHTML = "";
+            
+            if (tags.length === 0) {
+                box.innerHTML = `<span class="text-muted small">None identified.</span>`;
+                return;
+            }
+            
+            tags.forEach(tag => {
+                box.innerHTML += `<span class="skill-tag ${status}">${tag}</span>`;
+            });
+        }
+        
+        function renderList(listId, items, colorClass, iconName) {
+            const list = document.getElementById(listId);
+            if (!list) return;
+            list.innerHTML = "";
+            
+            if (items.length === 0) {
+                list.innerHTML = `<li class="text-muted small">None identified.</li>`;
+                return;
+            }
+            
+            items.forEach(item => {
+                list.innerHTML += `
+                    <li class="mb-2 list-unstyled d-flex align-items-start gap-2">
+                        <i class="fa-solid fa-${iconName} ${colorClass} mt-1 small"></i>
+                        <span>${item}</span>
+                    </li>
+                `;
+            });
+        }
+    });
+</script>
+{% endblock %}

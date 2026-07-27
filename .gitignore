@@ -1,0 +1,40 @@
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Database
+backend/resume_analyzer.db
+*.db
+*.sqlite3
+
+# Credentials & Config
+backend/.env
+.env
+.env.local
+.env.*
+
+# Uploads & Reports (User files)
+backend/app/uploads/*
+!backend/app/uploads/.gitkeep
+backend/app/reports/*
+!backend/app/reports/.gitkeep
+backend/app/temp/*
+!backend/app/temp/.gitkeep
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.cache/
+
+# IDE settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

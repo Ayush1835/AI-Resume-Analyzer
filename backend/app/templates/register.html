@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Register - AI Resume Analyzer{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="col-md-5">
+        <div class="card-glass fade-in">
+            <div class="text-center mb-4">
+                <i class="fa-solid fa-user-plus fa-3x mb-3 text-primary"></i>
+                <h2 class="fw-bold">Create Account</h2>
+                <p class="text-secondary">Get started with professional resume analytics</p>
+            </div>
+            
+            <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+            
+            <form id="registerForm">
+                <div class="mb-3">
+                    <label for="fullName" class="form-label text-secondary">Full Name</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-tertiary border-color text-secondary"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" class="form-control form-control-custom" id="fullName" required placeholder="John Doe">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="email" class="form-label text-secondary">Email address</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-tertiary border-color text-secondary"><i class="fa-solid fa-envelope"></i></span>
+                        <input type="email" class="form-control form-control-custom" id="email" required placeholder="name@domain.com">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="password" class="form-label text-secondary">Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-tertiary border-color text-secondary"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" class="form-control form-control-custom" id="password" required minlength="6" placeholder="Min 6 characters">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom w-100 mb-3">
+                    <i class="fa-solid fa-user-check me-2"></i>Create Account
+                </button>
+            </form>
+            
+            <div class="text-center">
+                <p class="text-secondary mb-0">Already have an account? <a href="/login" class="text-primary fw-bold">Sign In here</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
