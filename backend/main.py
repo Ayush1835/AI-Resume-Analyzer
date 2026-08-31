@@ -1,4 +1,14 @@
 import os
+import sys
+
+# Guarantee parent path is in sys.path BEFORE any backend imports
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(BASE_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 import logging
 from fastapi import FastAPI, Request, Response, status
 from fastapi.staticfiles import StaticFiles
@@ -6,10 +16,16 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from backend.app.database.connection import engine, Base, SessionLocal
-from backend.app.models.models import User
-from backend.app.services.auth_service import hash_password, HTMLUnauthorizedException
-from backend.app.routers import auth, resume, analysis, admin, views
+try:
+    from backend.app.database.connection import engine, Base, SessionLocal
+    from backend.app.models.models import User
+    from backend.app.services.auth_service import hash_password, HTMLUnauthorizedException
+    from backend.app.routers import auth, resume, analysis, admin, views
+except ModuleNotFoundError:
+    from app.database.connection import engine, Base, SessionLocal
+    from app.models.models import User
+    from app.services.auth_service import hash_password, HTMLUnauthorizedException
+    from app.routers import auth, resume, analysis, admin, views
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
