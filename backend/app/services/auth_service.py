@@ -95,8 +95,8 @@ def get_current_user(
         detail="Could not validate credentials",
     )
     
-    # Check if request is HTML to redirect to login page instead of raising 401
-    is_html_request = "text/html" in request.headers.get("accept", "")
+    # Check if request is HTML page view (excluding /api/ endpoints) to redirect to login page
+    is_html_request = ("text/html" in request.headers.get("accept", "")) and not request.url.path.startswith("/api/")
 
     if not token:
         if is_html_request:

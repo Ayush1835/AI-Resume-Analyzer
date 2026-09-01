@@ -331,6 +331,11 @@
                 });
                 
                 if (!analysisResponse.ok) {
+                    if (analysisResponse.status === 401) {
+                        alert("Your session has expired or the server restarted. Please log in again.");
+                        window.location.href = "/login";
+                        return;
+                    }
                     let errorMsg = "Resume analysis compilation failed.";
                     try {
                         const errData = await analysisResponse.json();
