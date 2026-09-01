@@ -1,7 +1,10 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from backend.app.database.connection import Base
+try:
+    from backend.app.database.connection import Base
+except ModuleNotFoundError:
+    from app.database.connection import Base
 
 class User(Base):
     __tablename__ = "users"

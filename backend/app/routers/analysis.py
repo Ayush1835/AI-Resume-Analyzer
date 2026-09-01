@@ -50,64 +50,64 @@ async def analyze_resume(
     db: Session = Depends(get_db)
 ):
     """Analyze a previously uploaded resume against a job description (text or file upload)."""
-    # 1. Fetch Resume
-    resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
-    if not resume:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Resume not found or access denied."
-        )
+    try:
+        # 1. Fetch Resume
+        resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume not found or access denied."
+            )
 
-    # 2. Extract JD text
-    extracted_jd_text = ""
-    if jd_text and jd_text.strip():
-        extracted_jd_text = jd_text.strip()
-    elif jd_file:
-        _, ext = os.path.splitext(jd_file.filename.lower())
-        if ext not in [".pdf", ".docx"]:
+        # 2. Extract JD text
+        extracted_jd_text = ""
+        if jd_text and jd_text.strip():
+            extracted_jd_text = jd_text.strip()
+        elif jd_file:
+            _, ext = os.path.splitext(jd_file.filename.lower())
+            if ext not in [".pdf", ".docx"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Unsupported job description format. Only PDF and DOCX files are allowed."
+                )
+                
+            # Write to temporary file for parsing
+            temp_file_name = f"jd_{uuid.uuid4().hex}{ext}"
+            temp_path = os.path.join(TEMP_DIR, temp_file_name)
+            try:
+                with open(temp_path, "wb") as buffer:
+                    content = await jd_file.read()
+                    buffer.write(content)
+                    
+                if ext == ".pdf":
+                    extracted_jd_text = extract_text_from_pdf(temp_path)
+                elif ext == ".docx":
+                    extracted_jd_text = extract_text_from_docx(temp_path)
+            finally:
+                # Delete temporary file
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+        else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unsupported job description format. Only PDF and DOCX files are allowed."
+                detail="Please provide a job description by pasting the text or uploading a file."
             )
             
-        # Write to temporary file for parsing
-        temp_file_name = f"jd_{uuid.uuid4().hex}{ext}"
-        temp_path = os.path.join(TEMP_DIR, temp_file_name)
-        try:
-            with open(temp_path, "wb") as buffer:
-                content = await jd_file.read()
-                buffer.write(content)
-                
-            if ext == ".pdf":
-                extracted_jd_text = extract_text_from_pdf(temp_path)
-            elif ext == ".docx":
-                extracted_jd_text = extract_text_from_docx(temp_path)
-        finally:
-            # Delete temporary file
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please provide a job description by pasting the text or uploading a file."
+        if not extracted_jd_text or not extracted_jd_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Could not extract readable text from the job description."
+            )
+            
+        # 3. Save Job Description to DB
+        new_jd = JobDescription(
+            title=jd_title or "Job Description",
+            text_content=extracted_jd_text
         )
+        db.add(new_jd)
+        db.commit()
+        db.refresh(new_jd)
         
-    if not extracted_jd_text or not extracted_jd_text.strip():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not extract readable text from the job description."
-        )
-        
-    # 3. Save Job Description to DB
-    new_jd = JobDescription(
-        title=jd_title or "Job Description",
-        text_content=extracted_jd_text
-    )
-    db.add(new_jd)
-    db.commit()
-    db.refresh(new_jd)
-    
-    try:
         # 4. Perform Scoring & Skills Gap Analysis
         parsed_res_dict = resume.extracted_json if isinstance(resume.extracted_json, dict) else {}
         analysis_results = analyze_resume_against_jd(
@@ -141,50 +141,53 @@ async def analyze_resume(
         db.add(new_analysis)
         db.commit()
         db.refresh(new_analysis)
+        
+        # 7. Generate PDF Report safely
+        try:
+            extracted_json = resume.extracted_json if isinstance(resume.extracted_json, dict) else {}
+            contact_dict = extracted_json.get("contact", {}) if isinstance(extracted_json.get("contact"), dict) else {}
+            applicant_name = contact_dict.get("name") or current_user.full_name or "Applicant"
+
+            report_filename = f"report_{new_analysis.id}_{uuid.uuid4().hex[:8]}.pdf"
+            report_path = os.path.join(REPORTS_DIR, report_filename)
+
+            scores_dict = {
+                "ats_score": new_analysis.ats_score,
+                "keyword_match_score": new_analysis.keyword_match_score,
+                "skills_match_score": new_analysis.skills_match_score,
+                "experience_match_score": new_analysis.experience_match_score,
+                "education_match_score": new_analysis.education_match_score,
+                "semantic_similarity_score": new_analysis.semantic_similarity_score
+            }
+
+            generate_pdf_report(
+                output_pdf_path=report_path,
+                applicant_name=applicant_name,
+                contact_info=contact_dict,
+                scores=scores_dict,
+                suggestions=new_analysis.suggestions_json,
+                ai_feedback=new_analysis.ai_feedback_json
+            )
+
+            new_report = Report(
+                analysis_id=new_analysis.id,
+                report_path=report_path
+            )
+            db.add(new_report)
+            db.commit()
+        except Exception as e:
+            logger.error(f"PDF Report generation skipped: {e}")
+            
+        return new_analysis
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Analysis engine exception: {e}")
+        logger.error(f"Unhandled error in analyze_resume: {e}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Analysis calculation failed: {str(e)}"
+            detail=f"Analysis calculation error: {str(e)}"
         )
-    
-    # 7. Generate PDF Report safely
-    try:
-        extracted_json = resume.extracted_json if isinstance(resume.extracted_json, dict) else {}
-        contact_dict = extracted_json.get("contact", {}) if isinstance(extracted_json.get("contact"), dict) else {}
-        applicant_name = contact_dict.get("name") or current_user.full_name or "Applicant"
-
-        report_filename = f"report_{new_analysis.id}_{uuid.uuid4().hex[:8]}.pdf"
-        report_path = os.path.join(REPORTS_DIR, report_filename)
-
-        scores_dict = {
-            "ats_score": new_analysis.ats_score,
-            "keyword_match_score": new_analysis.keyword_match_score,
-            "skills_match_score": new_analysis.skills_match_score,
-            "experience_match_score": new_analysis.experience_match_score,
-            "education_match_score": new_analysis.education_match_score,
-            "semantic_similarity_score": new_analysis.semantic_similarity_score
-        }
-
-        generate_pdf_report(
-            output_pdf_path=report_path,
-            applicant_name=applicant_name,
-            contact_info=contact_dict,
-            scores=scores_dict,
-            suggestions=new_analysis.suggestions_json,
-            ai_feedback=new_analysis.ai_feedback_json
-        )
-
-        new_report = Report(
-            analysis_id=new_analysis.id,
-            report_path=report_path
-        )
-        db.add(new_report)
-        db.commit()
-    except Exception as e:
-        logger.error(f"PDF Report generation skipped: {e}")
-        
-    return new_analysis
 
 @router.get("/history", response_model=List[AnalysisOut])
 def get_analysis_history(
