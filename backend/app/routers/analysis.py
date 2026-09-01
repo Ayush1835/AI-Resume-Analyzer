@@ -1,6 +1,9 @@
 import os
 import uuid
+import logging
 from typing import List, Optional
+
+logger = logging.getLogger("AI_Resume_Analyzer")
 from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
