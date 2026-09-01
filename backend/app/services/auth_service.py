@@ -9,9 +9,14 @@ from sqlalchemy.orm import Session
 import bcrypt
 from dotenv import load_dotenv
 
-from backend.app.database.connection import get_db
-from backend.app.models.models import User
-from backend.app.schemas.schemas import TokenData
+try:
+    from backend.app.database.connection import get_db
+    from backend.app.models.models import User
+    from backend.app.schemas.schemas import TokenData
+except ModuleNotFoundError:
+    from app.database.connection import get_db
+    from app.models.models import User
+    from app.schemas.schemas import TokenData
 
 load_dotenv()
 

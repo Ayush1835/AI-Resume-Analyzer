@@ -6,14 +6,24 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Dict, Optional
 
-from backend.app.database.connection import get_db
-from backend.app.models.models import User, Resume, Analysis, JobDescription
-from backend.app.services.auth_service import (
-    get_current_user,
-    get_current_admin,
-    decode_access_token,
-    get_token_from_request
-)
+try:
+    from backend.app.database.connection import get_db
+    from backend.app.models.models import User, Resume, Analysis, JobDescription
+    from backend.app.services.auth_service import (
+        get_current_user,
+        get_current_admin,
+        decode_access_token,
+        get_token_from_request
+    )
+except ModuleNotFoundError:
+    from app.database.connection import get_db
+    from app.models.models import User, Resume, Analysis, JobDescription
+    from app.services.auth_service import (
+        get_current_user,
+        get_current_admin,
+        decode_access_token,
+        get_token_from_request
+    )
 
 router = APIRouter(tags=["Views"])
 

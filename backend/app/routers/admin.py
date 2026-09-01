@@ -3,10 +3,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from backend.app.database.connection import get_db
-from backend.app.models.models import User, Resume, Analysis
-from backend.app.schemas.schemas import UserOut, ResumeOut
-from backend.app.services.auth_service import get_current_admin
+try:
+    from backend.app.database.connection import get_db
+    from backend.app.models.models import User, Resume, Analysis
+    from backend.app.schemas.schemas import UserOut, ResumeOut
+    from backend.app.services.auth_service import get_current_admin
+except ModuleNotFoundError:
+    from app.database.connection import get_db
+    from app.models.models import User, Resume, Analysis
+    from app.schemas.schemas import UserOut, ResumeOut
+    from app.services.auth_service import get_current_admin
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Panel"])
 

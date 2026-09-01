@@ -4,7 +4,10 @@ from typing import Dict, Any, List, Tuple
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from backend.app.services.parser_service import parse_skills, parse_resume_text
+try:
+    from backend.app.services.parser_service import parse_skills, parse_resume_text
+except ModuleNotFoundError:
+    from app.services.parser_service import parse_skills, parse_resume_text
 
 # Lazy load Sentence Transformers to prevent crash if model files can't be fetched
 _model = None

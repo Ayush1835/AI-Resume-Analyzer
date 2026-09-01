@@ -4,15 +4,26 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 
-from backend.app.database.connection import get_db
-from backend.app.models.models import Resume, User
-from backend.app.schemas.schemas import ResumeOut
-from backend.app.services.auth_service import get_current_user
-from backend.app.services.parser_service import (
-    extract_text_from_pdf,
-    extract_text_from_docx,
-    parse_resume_text
-)
+try:
+    from backend.app.database.connection import get_db
+    from backend.app.models.models import Resume, User
+    from backend.app.schemas.schemas import ResumeOut
+    from backend.app.services.auth_service import get_current_user
+    from backend.app.services.parser_service import (
+        extract_text_from_pdf,
+        extract_text_from_docx,
+        parse_resume_text
+    )
+except ModuleNotFoundError:
+    from app.database.connection import get_db
+    from app.models.models import Resume, User
+    from app.schemas.schemas import ResumeOut
+    from app.services.auth_service import get_current_user
+    from app.services.parser_service import (
+        extract_text_from_pdf,
+        extract_text_from_docx,
+        parse_resume_text
+    )
 
 router = APIRouter(prefix="/api/resumes", tags=["Resumes"])
 

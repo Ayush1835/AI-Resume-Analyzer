@@ -3,16 +3,28 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
-from backend.app.database.connection import get_db
-from backend.app.models.models import User
-from backend.app.schemas.schemas import UserCreate, UserOut, Token
-from backend.app.services.auth_service import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    get_current_user,
-    ACCESS_TOKEN_EXPIRE_MINUTES
-)
+try:
+    from backend.app.database.connection import get_db
+    from backend.app.models.models import User
+    from backend.app.schemas.schemas import UserCreate, UserOut, Token
+    from backend.app.services.auth_service import (
+        hash_password,
+        verify_password,
+        create_access_token,
+        get_current_user,
+        ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+except ModuleNotFoundError:
+    from app.database.connection import get_db
+    from app.models.models import User
+    from app.schemas.schemas import UserCreate, UserOut, Token
+    from app.services.auth_service import (
+        hash_password,
+        verify_password,
+        create_access_token,
+        get_current_user,
+        ACCESS_TOKEN_EXPIRE_MINUTES
+    )
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 

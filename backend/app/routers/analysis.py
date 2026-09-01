@@ -5,17 +5,30 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile,
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from backend.app.database.connection import get_db
-from backend.app.models.models import Resume, JobDescription, Analysis, Report, User
-from backend.app.schemas.schemas import AnalysisOut
-from backend.app.services.auth_service import get_current_user
-from backend.app.services.parser_service import (
-    extract_text_from_pdf,
-    extract_text_from_docx
-)
-from backend.app.services.similarity_service import analyze_resume_against_jd
-from backend.app.services.ai_service import get_ai_feedback
-from backend.app.services.pdf_service import generate_pdf_report
+try:
+    from backend.app.database.connection import get_db
+    from backend.app.models.models import Resume, JobDescription, Analysis, Report, User
+    from backend.app.schemas.schemas import AnalysisOut
+    from backend.app.services.auth_service import get_current_user
+    from backend.app.services.parser_service import (
+        extract_text_from_pdf,
+        extract_text_from_docx
+    )
+    from backend.app.services.similarity_service import analyze_resume_against_jd
+    from backend.app.services.ai_service import get_ai_feedback
+    from backend.app.services.pdf_service import generate_pdf_report
+except ModuleNotFoundError:
+    from app.database.connection import get_db
+    from app.models.models import Resume, JobDescription, Analysis, Report, User
+    from app.schemas.schemas import AnalysisOut
+    from app.services.auth_service import get_current_user
+    from app.services.parser_service import (
+        extract_text_from_pdf,
+        extract_text_from_docx
+    )
+    from app.services.similarity_service import analyze_resume_against_jd
+    from app.services.ai_service import get_ai_feedback
+    from app.services.pdf_service import generate_pdf_report
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 
