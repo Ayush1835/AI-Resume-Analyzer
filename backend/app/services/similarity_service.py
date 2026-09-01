@@ -28,7 +28,17 @@ def calculate_semantic_similarity(text1: str, text2: str) -> float:
     """Calculate semantic similarity between two texts using Sentence Transformers or TF-IDF fallback."""
     if not text1.strip() or not text2.strip():
         return 0.0
-        
+
+    # On cloud platforms (like Render), use ultra-fast TF-IDF to stay well within 512MB RAM cap
+    if "RENDER" in os.environ or "PORT" in os.environ:
+        try:
+            vectorizer = TfidfVectorizer()
+            tfidf = vectorizer.fit_transform([text1, text2])
+            sim = cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
+            return round(float(sim) * 100.0, 1)
+        except Exception:
+            return 50.0
+
     model = get_sentence_transformer_model()
     if model is not None:
         try:

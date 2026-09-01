@@ -7,12 +7,8 @@ from typing import Dict, Any, List, Tuple
 import spacy
 from datetime import datetime
 
-# Load spaCy model safely
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    # If the user doesn't have it downloaded, we'll initialize a mock or load on demand
-    nlp = None
+# Set nlp to None by default for lazy loading
+nlp = None
 
 # A robust list of common technical and soft skills for matching
 COMMON_SKILLS = [
