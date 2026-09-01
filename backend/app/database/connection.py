@@ -6,8 +6,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Database URL configuration (defaults to local SQLite database)
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./resume_analyzer.db")
+# Ensure absolute path for SQLite database file to avoid working directory mismatches
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "resume_analyzer.db")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL or DATABASE_URL.startswith("sqlite:///./"):
+    DATABASE_URL = f"sqlite:///{DEFAULT_DB_PATH}"
 
 # SQLite connection requires check_same_thread=False for FastAPI concurrency
 connect_args = {}
