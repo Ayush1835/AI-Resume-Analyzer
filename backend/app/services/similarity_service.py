@@ -84,7 +84,7 @@ def extract_required_experience(jd_text: str) -> float:
         return float(max(years))
     return 0.0 # Default if no experience is explicitly mentioned
 
-def check_education_match(candidate_edu: List[str], jd_text: str) -> Tuple[int, str]:
+def check_education_match(candidate_edu: List[Any], jd_text: str) -> Tuple[int, str]:
     """Calculate education match score based on candidate degrees and JD requirements."""
     jd_text_lower = jd_text.lower()
     
@@ -103,7 +103,19 @@ def check_education_match(candidate_edu: List[str], jd_text: str) -> Tuple[int, 
                 
     # Determine Candidate level
     cand_level = 0
-    candidate_edu_str = " ".join(candidate_edu).lower()
+    edu_strings = []
+    if isinstance(candidate_edu, list):
+        for item in candidate_edu:
+            if isinstance(item, str):
+                edu_strings.append(item)
+            elif isinstance(item, dict):
+                edu_strings.append(" ".join(str(v) for v in item.values()))
+            else:
+                edu_strings.append(str(item))
+    elif isinstance(candidate_edu, str):
+        edu_strings.append(candidate_edu)
+        
+    candidate_edu_str = " ".join(edu_strings).lower()
     for degree_name, level in degree_hierarchy.items():
         if re.search(rf"\b{degree_name}\b", candidate_edu_str):
             if level > cand_level:
@@ -139,7 +151,8 @@ def analyze_resume_against_jd(resume_text: str, parsed_resume: Dict[str, Any], j
 
     # 3. Skills Match
     jd_skills = parse_skills(jd_text)
-    cand_skills = parsed_resume.get("skills", [])
+    raw_cand_skills = parsed_resume.get("skills", [])
+    cand_skills = [s if isinstance(s, str) else str(s) for s in raw_cand_skills] if isinstance(raw_cand_skills, list) else []
     
     matched_skills = []
     missing_skills = []
