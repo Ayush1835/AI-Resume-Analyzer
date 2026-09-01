@@ -35,22 +35,50 @@ COMMON_SKILLS = [
 ]
 
 def extract_text_from_pdf(file_path: str) -> str:
-    """Extract text from PDF using PyMuPDF and pdfplumber fallback."""
+    """Extract text from PDF using PyMuPDF, pdfplumber, and PyPDF fallback layers."""
     text = ""
-    # Try PyMuPDF (fitz) first as it is super fast and clean
+    
+    # 1. Try PyMuPDF (fitz) first as it is fast and clean
     try:
         doc = fitz.open(file_path)
         for page in doc:
-            text += page.get_text()
+            page_text = page.get_text()
+            if page_text:
+                text += page_text + "\n"
         doc.close()
     except Exception as e:
-        # Fallback to pdfplumber
+        print(f"PyMuPDF extraction failed: {e}")
+
+    # 2. If text is still empty, fallback to pdfplumber
+    if not text.strip():
         try:
             with pdfplumber.open(file_path) as pdf:
                 for page in pdf.pages:
-                    text += page.extract_text() or ""
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
         except Exception as e2:
-            print(f"Error extracting PDF: {e2}")
+            print(f"pdfplumber extraction failed: {e2}")
+
+    # 3. If text is still empty, fallback to pypdf / PyPDF2
+    if not text.strip():
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(file_path)
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        except Exception:
+            try:
+                import PyPDF2
+                reader = PyPDF2.PdfReader(file_path)
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+            except Exception as e3:
+                print(f"PyPDF extraction failed: {e3}")
     
     # Clean spacing issues
     text = re.sub(r'\s+', ' ', text)
