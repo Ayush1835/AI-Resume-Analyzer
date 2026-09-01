@@ -331,8 +331,14 @@
                 });
                 
                 if (!analysisResponse.ok) {
-                    const errData = await analysisResponse.json();
-                    alert(errData.detail || "Resume analysis compilation failed.");
+                    let errorMsg = "Resume analysis compilation failed.";
+                    try {
+                        const errData = await analysisResponse.json();
+                        errorMsg = errData.detail || errorMsg;
+                    } catch (e) {
+                        errorMsg = `Server returned status ${analysisResponse.status}. Please check job requirements.`;
+                    }
+                    alert(errorMsg);
                     resetUI();
                     return;
                 }

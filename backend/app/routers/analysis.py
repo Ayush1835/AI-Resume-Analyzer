@@ -79,7 +79,7 @@ async def analyze_resume(
             detail="Please provide a job description by pasting the text or uploading a file."
         )
         
-    if not extracted_jd_text.strip():
+    if not extracted_jd_text or not extracted_jd_text.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Could not extract readable text from the job description."
@@ -94,38 +94,46 @@ async def analyze_resume(
     db.commit()
     db.refresh(new_jd)
     
-    # 4. Perform Scoring & Skills Gap Analysis
-    analysis_results = analyze_resume_against_jd(
-        resume_text=resume.extracted_text,
-        parsed_resume=resume.extracted_json or {},
-        jd_text=extracted_jd_text
-    )
-    
-    # 5. Fetch AI Suggestions
-    ai_feedback = get_ai_feedback(
-        resume_text=resume.extracted_text,
-        parsed_resume=resume.extracted_json or {},
-        jd_text=extracted_jd_text,
-        analysis_data=analysis_results
-    )
-    
-    # 6. Save Analysis to DB
-    new_analysis = Analysis(
-        user_id=current_user.id,
-        resume_id=resume.id,
-        job_description_id=new_jd.id,
-        ats_score=analysis_results["ats_score"],
-        keyword_match_score=analysis_results["keyword_match_score"],
-        skills_match_score=analysis_results["skills_match_score"],
-        experience_match_score=analysis_results["experience_match_score"],
-        education_match_score=analysis_results["education_match_score"],
-        semantic_similarity_score=analysis_results["semantic_similarity_score"],
-        suggestions_json=analysis_results["suggestions"],
-        ai_feedback_json=ai_feedback
-    )
-    db.add(new_analysis)
-    db.commit()
-    db.refresh(new_analysis)
+    try:
+        # 4. Perform Scoring & Skills Gap Analysis
+        parsed_res_dict = resume.extracted_json if isinstance(resume.extracted_json, dict) else {}
+        analysis_results = analyze_resume_against_jd(
+            resume_text=resume.extracted_text or "",
+            parsed_resume=parsed_res_dict,
+            jd_text=extracted_jd_text
+        )
+        
+        # 5. Fetch AI Suggestions
+        ai_feedback = get_ai_feedback(
+            resume_text=resume.extracted_text or "",
+            parsed_resume=parsed_res_dict,
+            jd_text=extracted_jd_text,
+            analysis_data=analysis_results
+        )
+        
+        # 6. Save Analysis to DB
+        new_analysis = Analysis(
+            user_id=current_user.id,
+            resume_id=resume.id,
+            job_description_id=new_jd.id,
+            ats_score=analysis_results.get("ats_score", 0),
+            keyword_match_score=analysis_results.get("keyword_match_score", 0),
+            skills_match_score=analysis_results.get("skills_match_score", 0),
+            experience_match_score=analysis_results.get("experience_match_score", 0),
+            education_match_score=analysis_results.get("education_match_score", 0),
+            semantic_similarity_score=analysis_results.get("semantic_similarity_score", 0),
+            suggestions_json=analysis_results.get("suggestions", {}),
+            ai_feedback_json=ai_feedback
+        )
+        db.add(new_analysis)
+        db.commit()
+        db.refresh(new_analysis)
+    except Exception as e:
+        logger.error(f"Analysis engine exception: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Analysis calculation failed: {str(e)}"
+        )
     
     # 7. Generate PDF Report safely
     try:
